@@ -34,12 +34,12 @@ func NewDnsInjectServer() *DnsInjectServer {
 	return &self
 }
 
-func (self *DnsInjectServer) Clear(domainName string) {
+func (self *DnsInjectServer) Empty(domainName string) {
 	delete(self.dnsMap4, domainName)
 	delete(self.dnsMap6, domainName)
 }
 
-func (self *DnsInjectServer) Register4(domainName string, ip net.IP) {
+func (self *DnsInjectServer) AddRecord4(domainName string, ip net.IP) {
 	if ip == nil {
 		return
 	}
@@ -59,7 +59,7 @@ func (self *DnsInjectServer) Register4(domainName string, ip net.IP) {
 	self.dnsMap4[domainName] = val
 }
 
-func (self *DnsInjectServer) Register6(domainName string, ip net.IP) {
+func (self *DnsInjectServer) AddRecord6(domainName string, ip net.IP) {
 	if ip == nil {
 		return
 	}
@@ -79,7 +79,7 @@ func (self *DnsInjectServer) Register6(domainName string, ip net.IP) {
 	self.dnsMap6[domainName] = val
 }
 
-func (self *DnsInjectServer) Register(domainName string, ipStr string) {
+func (self *DnsInjectServer) AddRecord(domainName string, ipStr string) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return
@@ -87,11 +87,11 @@ func (self *DnsInjectServer) Register(domainName string, ipStr string) {
 
 	for _, c := range ipStr {
 		if c == '.' {
-			self.Register4(domainName, ip)
+			self.AddRecord4(domainName, ip)
 			break
 
 		} else if c == ':' {
-			self.Register6(domainName, ip)
+			self.AddRecord6(domainName, ip)
 			break
 		}
 	}

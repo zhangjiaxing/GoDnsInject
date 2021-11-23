@@ -3,65 +3,56 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcapgo"
+	"github.com/google/gopacket/pcap"
 )
 
 func getDnsInjectServer() *DnsInjectServer {
 	dnsServer := NewDnsInjectServer()
-	dnsServer.Register("gw.local", "192.168.1.1")
-	dnsServer.Register("gw.local", "192.168.1.1")
-	dnsServer.Register("gw.local", "192.168.1.2")
-	dnsServer.Register("gw.local", "192.168.1.3")
-	dnsServer.Register("gw.local", "192.168.1.4")
+	dnsServer.AddRecord("gw.local", "192.168.1.1")
+	dnsServer.AddRecord("gw.local", "192.168.1.1")
+	dnsServer.AddRecord("gw.local", "192.168.1.2")
+	dnsServer.AddRecord("gw.local", "192.168.1.3")
+	dnsServer.AddRecord("gw.local", "192.168.1.4")
+	dnsServer.AddRecord("gw.local", "192.168.1.5")
+	dnsServer.AddRecord("gw.local", "192.168.1.6")
+	dnsServer.AddRecord("gw.local", "192.168.1.7")
+	dnsServer.AddRecord("gw.local", "192.168.1.8")
+	dnsServer.AddRecord("gw.local", "192.168.1.9")
+	dnsServer.AddRecord("gw.local", "192.168.1.10")
 
-	dnsServer.Register("test.local", "asdf34ga")
-	dnsServer.Register("test.local", "192.168.1.1")
+	dnsServer.AddRecord("test.local", "asdf34ga")
+	dnsServer.AddRecord("test.local", "192.168.1.1")
 
-	dnsServer.Register("test.local", "192.168.2.10")
-	dnsServer.Register("test.local", "192.168.2.100")
-	dnsServer.Register("test.local", ".1asdfadfwe")
+	dnsServer.AddRecord("test.local", "192.168.2.10")
+	dnsServer.AddRecord("test.local", "192.168.2.100")
+	dnsServer.AddRecord("test.local", ".1asdfadfwe")
 
-	dnsServer.Register("test.local", "fe80::800:27ff:fe00:0")
-	dnsServer.Register("test.local", "::1")
-	dnsServer.Register("test.local", "::1")
-	dnsServer.Register("test.local", "::1asdfadfwe")
+	dnsServer.AddRecord("test.local", "fe80::800:27ff:fe00:0")
+	dnsServer.AddRecord("test.local", "::1")
+	dnsServer.AddRecord("test.local", "::1")
+	dnsServer.AddRecord("test.local", "::1asdfadfwe")
 
 	return dnsServer
 }
 
 func main() {
-	f, err := os.Create("/tmp/eth0.pcap")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	pcapw := pcapgo.NewWriter(f)
-	if err := pcapw.WriteFileHeader(1600, layers.LinkTypeEthernet); err != nil {
-		log.Fatalf("WriteFileHeader: %v", err)
-	}
-
-	handle, err := pcapgo.NewEthernetHandle("eth0")
-	if err != nil {
-		log.Fatalf("OpenEthernet: %v", err)
-	}
-
-	pkgsrc := gopacket.NewPacketSource(handle, layers.LayerTypeEthernet)
-
 	dnsInjectServer := getDnsInjectServer()
 
-	for packet := range pkgsrc.Packets() {
-		// if err := pcapw.WritePacket(packet.Metadata().CaptureInfo, packet.Data()); err != nil {
-		// 	log.Fatalf("pcap.WritePacket(): %v", err)
-		// }
-
-		dnsLayer := packet.Layer(layers.LayerTypeDNS)
-		if dnsLayer != nil {
-			fmt.Println("got one DNS packet")
-			handlePacket(&packet, dnsInjectServer, pcapw)
+	if handle, err := pcap.OpenLive("eth0", 1600, true, pcap.BlockForever); err != nil {
+		panic(err)
+	} else if err := handle.SetBPFFilter("udp and port 53"); err != nil {
+		panic(err)
+	} else {
+		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+		for packet := range packetSource.Packets() {
+			dnsLayer := packet.Layer(layers.LayerTypeDNS)
+			if dnsLayer != nil {
+				fmt.Println("got one DNS packet")
+				handlePacket(&packet, dnsInjectServer, handle)
+			}
 		}
 	}
 }
@@ -71,7 +62,7 @@ const (
 	QRdnsResponse = true
 )
 
-func handlePacket(packet *gopacket.Packet, dnsInjectServer *DnsInjectServer, pcapw *pcapgo.Writer) {
+func handlePacket(packet *gopacket.Packet, dnsInjectServer *DnsInjectServer, handle *pcap.Handle) {
 	dnsLayer := (*packet).Layer(layers.LayerTypeDNS)
 	if dnsLayer == nil {
 		fmt.Println("dnsLayer is nil")
@@ -91,30 +82,8 @@ func handlePacket(packet *gopacket.Packet, dnsInjectServer *DnsInjectServer, pca
 
 	writeData := dnsInjectServer.GetDNSResponseBytes(packet)
 
-	captureInfo := (*packet).Metadata().CaptureInfo
-	captureInfo.Length = len(writeData)
-	captureInfo.CaptureLength = len(writeData)
-
-	if err := pcapw.WritePacket(captureInfo, writeData); err != nil {
-		log.Fatalf("pcap.WritePacket(): %v", err)
+	if err := handle.WritePacketData(writeData); err != nil {
+		panic(err)
 	}
-
-	//ques := dnsStruct.Questions
-
-	//for _, query := range ques {
-	// qryName := string(query.Name)
-
-	// if targetIpList, has := dnsInjectServer.Lookup(qryName, query.Type); has {
-	// 	for _, target := range targetIpList {
-	// 		fmt.Println("DNS Inject ", qryName, query.Type, target.String())
-	// 	}
-	// }
-	//}
-
-	// answers := dnsStruct.Answers
-	// for _, ans := range answers {
-	// 	fmt.Println("DNS Response", string(ans.Name), ans.Type, ans.IP, string(ans.CNAME))
-	// }
-
-	fmt.Print("\n\n")
+	fmt.Println()
 }
