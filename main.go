@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -11,29 +10,29 @@ import (
 
 func getDnsInjectServer() *DnsInjectServer {
 	dnsServer := NewDnsInjectServer()
-	dnsServer.AddRecord("gw.local", "192.168.1.1")
-	dnsServer.AddRecord("gw.local", "192.168.1.1")
-	dnsServer.AddRecord("gw.local", "192.168.1.2")
-	dnsServer.AddRecord("gw.local", "192.168.1.3")
-	dnsServer.AddRecord("gw.local", "192.168.1.4")
-	dnsServer.AddRecord("gw.local", "192.168.1.5")
-	dnsServer.AddRecord("gw.local", "192.168.1.6")
-	dnsServer.AddRecord("gw.local", "192.168.1.7")
-	dnsServer.AddRecord("gw.local", "192.168.1.8")
-	dnsServer.AddRecord("gw.local", "192.168.1.9")
-	dnsServer.AddRecord("gw.local", "192.168.1.10")
+	dnsServer.AddRecord("gw.com", "192.168.1.1")
+	dnsServer.AddRecord("gw.com", "192.168.1.1")
+	dnsServer.AddRecord("gw.com", "192.168.1.2")
+	dnsServer.AddRecord("gw.com", "192.168.1.3")
+	dnsServer.AddRecord("gw.com", "192.168.1.4")
+	dnsServer.AddRecord("gw.com", "192.168.1.5")
+	dnsServer.AddRecord("gw.com", "192.168.1.6")
+	dnsServer.AddRecord("gw.com", "192.168.1.7")
+	dnsServer.AddRecord("gw.com", "192.168.1.8")
+	dnsServer.AddRecord("gw.com", "192.168.1.9")
+	dnsServer.AddRecord("gw.com", "192.168.1.10")
 
-	dnsServer.AddRecord("test.local", "asdf34ga")
-	dnsServer.AddRecord("test.local", "192.168.1.1")
+	dnsServer.AddRecord("test.com", "asdf34ga")
+	dnsServer.AddRecord("test.com", "192.168.1.1")
 
-	dnsServer.AddRecord("test.local", "192.168.2.10")
-	dnsServer.AddRecord("test.local", "192.168.2.100")
-	dnsServer.AddRecord("test.local", ".1asdfadfwe")
+	dnsServer.AddRecord("test.com", "192.168.2.10")
+	dnsServer.AddRecord("test.com", "192.168.2.100")
+	dnsServer.AddRecord("test.com", ".1asdfadfwe")
 
-	dnsServer.AddRecord("test.local", "fe80::800:27ff:fe00:0")
-	dnsServer.AddRecord("test.local", "::1")
-	dnsServer.AddRecord("test.local", "::1")
-	dnsServer.AddRecord("test.local", "::1asdfadfwe")
+	dnsServer.AddRecord("test.com", "fe80::800:27ff:fe00:0")
+	dnsServer.AddRecord("test.com", "::1")
+	dnsServer.AddRecord("test.com", "::1")
+	dnsServer.AddRecord("test.com", "::1asdfadfwe")
 
 	return dnsServer
 }
@@ -50,7 +49,6 @@ func main() {
 		for packet := range packetSource.Packets() {
 			dnsLayer := packet.Layer(layers.LayerTypeDNS)
 			if dnsLayer != nil {
-				fmt.Println("got one DNS packet")
 				handlePacket(&packet, dnsInjectServer, handle)
 			}
 		}
@@ -69,21 +67,27 @@ func handlePacket(packet *gopacket.Packet, dnsInjectServer *DnsInjectServer, han
 		return
 	}
 
-	dnsData := dnsLayer.LayerContents()
-	dnsStruct := &layers.DNS{}
+	// dnsData := dnsLayer.LayerContents()
+	// dnsStruct := &layers.DNS{}
 
-	if err := dnsStruct.DecodeFromBytes(dnsData, gopacket.NilDecodeFeedback); err != nil {
-		log.Fatalf("could not decode: %v", err)
-	}
+	// if err := dnsStruct.DecodeFromBytes(dnsData, gopacket.NilDecodeFeedback); err != nil {
+	// 	log.Fatalf("could not decode: %v", err)
+	// }
 
-	if dnsStruct.QR != QRdnsQuery {
-		return
-	}
+	// if dnsStruct.QR != QRdnsQuery {
+	// 	return
+	// }
+
+	// request := dnsStruct.Questions[0]
+	// fmt.Println("Query for ", string(request.Name))
+	// responseList, ok := dnsInjectServer.Lookup(string(request.Name), request.Type)
+	// if ok {
+	// 	fmt.Println("Response ", responseList)
+	// }
 
 	writeData := dnsInjectServer.GetDNSResponseBytes(packet)
 
 	if err := handle.WritePacketData(writeData); err != nil {
 		panic(err)
 	}
-	fmt.Println()
 }
